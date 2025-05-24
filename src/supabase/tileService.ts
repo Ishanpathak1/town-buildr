@@ -263,12 +263,22 @@ export const fetchTiles = async (): Promise<Tile[]> => {
 export const placeTile = async (x: number, y: number, type: TileType, playerId: string): Promise<Tile | null> => {
   console.log('placeTile called with:', { x, y, type, playerId });
   
-  const tile: Tile = {
+  // For demo mode, we can use simple string IDs
+  const demoTile: Tile = {
     x,
     y,
     type,
     placed_by: playerId,
     id: `${x}-${y}`
+  };
+
+  // For Supabase, we don't set the id - let it auto-generate
+  const supabaseTile = {
+    x,
+    y,
+    type,
+    placed_by: playerId
+    // No id field - let Supabase auto-generate the UUID
   };
 
   if (isDemoMode || forceDemoMode) {
@@ -279,16 +289,16 @@ export const placeTile = async (x: number, y: number, type: TileType, playerId: 
     if (existingIndex >= 0) {
       // Update existing tile
       console.log('Updating existing tile at', x, y);
-      demoTiles[existingIndex] = tile;
+      demoTiles[existingIndex] = demoTile;
     } else {
       // Add new tile
       console.log('Adding new tile at', x, y);
-      demoTiles.push(tile);
+      demoTiles.push(demoTile);
     }
     
     // Notify listeners
     console.log('Notifying', tileListeners.length, 'listeners about placed tile');
-    tileListeners.forEach(callback => callback(tile));
+    tileListeners.forEach(callback => callback(demoTile));
     
     // Also broadcast this tile update to other tabs via localStorage
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
@@ -299,7 +309,7 @@ export const placeTile = async (x: number, y: number, type: TileType, playerId: 
         
         // Store the tile update with timestamp
         localStorage.setItem(tileUpdateKey, JSON.stringify({
-          tile,
+          tile: demoTile,
           timestamp: Date.now(),
           sessionId: SESSION_ID
         }));
@@ -310,7 +320,7 @@ export const placeTile = async (x: number, y: number, type: TileType, playerId: 
       }
     }
     
-    return tile;
+    return demoTile;
   }
 
   try {
@@ -328,7 +338,7 @@ export const placeTile = async (x: number, y: number, type: TileType, playerId: 
       // Update existing tile
       result = await supabase
         .from(TILES_TABLE)
-        .update(tile)
+        .update(supabaseTile)
         .eq('x', x)
         .eq('y', y)
         .select()
@@ -337,7 +347,7 @@ export const placeTile = async (x: number, y: number, type: TileType, playerId: 
       // Insert new tile
       result = await supabase
         .from(TILES_TABLE)
-        .insert(tile)
+        .insert(supabaseTile)
         .select()
         .single();
     }

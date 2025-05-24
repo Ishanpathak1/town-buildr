@@ -2,6 +2,24 @@ import React, { useRef, useEffect, useState } from 'react';
 import type { Tile, Player, TileType } from '../types/game';
 import { updatePlayerCursor } from '../supabase/tileService';
 import '../styles/GameRenderer.css';
+import { initializeGameTime, updateGameTime, formatGameTime } from '../game/TimeSystem';
+import { generateWeather, updateWeather } from '../game/WeatherSystem';
+import { getRandomSpecialTile } from '../game/SpecialTiles';
+import type { GameTime } from '../game/TimeSystem';
+// Import type separately to avoid conflicts
+import type { SpecialTile } from '../game/SpecialTiles';
+
+// Define Weather type locally to avoid import conflicts
+interface WeatherData {
+  type: 'clear' | 'cloudy' | 'rainy' | 'stormy' | 'snowy' | 'foggy';
+  intensity: number;
+  duration: number;
+  timeRemaining: number;
+  effects: {
+    visualFilter: string;
+    scoreMultiplier: number;
+  };
+}
 
 // Tile colors and icons for rendering
 const TILE_COLORS: Record<TileType, string> = {
@@ -24,6 +42,10 @@ const TILE_ICONS: Record<TileType, string> = {
   empty: ''
 };
 
+// Add these constants at the top of your file (before the component definition)
+const GRID_SIZE = 20; // 20x20 grid
+const DEFAULT_CANVAS_SIZE = 800; // Larger default canvas size in pixels
+
 interface GameRendererProps {
   tiles: Record<string, Tile>;
   players: Record<string, Player>;
@@ -31,6 +53,9 @@ interface GameRendererProps {
   playerId: string;
   onTilePlace: (x: number, y: number, type: TileType) => void;
   setPlayers: React.Dispatch<React.SetStateAction<Record<string, Player>>>;
+  specialTiles?: Record<string, SpecialTile>;
+  weather?: WeatherData;
+  gameTime?: GameTime;
 }
 
 const GameRenderer: React.FC<GameRendererProps> = ({
@@ -39,52 +64,61 @@ const GameRenderer: React.FC<GameRendererProps> = ({
   selectedTile,
   playerId,
   onTilePlace,
-  setPlayers
+  setPlayers,
+  specialTiles = {},
+  weather = { 
+    type: 'clear', 
+    intensity: 0, 
+    duration: 0, 
+    timeRemaining: 0, 
+    effects: { visualFilter: 'none', scoreMultiplier: 1 } 
+  },
+  gameTime = { 
+    day: 1, 
+    hour: 12, 
+    minute: 0, 
+    isDayTime: true, 
+    timeOfDay: 'day' 
+  }
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 800 });
+  const [canvasSize, setCanvasSize] = useState({ width: DEFAULT_CANVAS_SIZE, height: DEFAULT_CANVAS_SIZE });
   const [hoveredTile, setHoveredTile] = useState<{ x: number, y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
   const [tileSize, setTileSize] = useState(32); // Pixels per tile
+  const [showHelp, setShowHelp] = useState(false);
   
   // Update current player's cursor position based on mouse movement
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return;
     
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left + cameraOffset.x) / tileSize);
-    const y = Math.floor((e.clientY - rect.top + cameraOffset.y) / tileSize);
+    const cellSize = rect.width / GRID_SIZE;
     
-    // Update hovered tile
-    setHoveredTile({ x, y });
+    // Calculate grid coordinates
+    const x = Math.floor((e.clientX - rect.left) / cellSize);
+    const y = Math.floor((e.clientY - rect.top) / cellSize);
     
-    // Add this log
-    console.log(`Sending cursor position (${x}, ${y}) to Supabase`);
-    
-    // Update player cursor position in state and send to other players
-    updatePlayerCursor(playerId, x, y).catch(err => {
-      console.error("Error updating cursor position:", err);
-    });
-    
-    // Also update the local player state for immediate feedback
-    setPlayers(prev => ({
-      ...prev,
-      [playerId]: {
-        ...prev[playerId],
-        cursor: { x, y },
-        lastPlaced: prev[playerId]?.lastPlaced || 0
-      }
-    }));
-    
-    // Handle dragging (panning the camera)
-    if (isDragging) {
-      setCameraOffset({
-        x: cameraOffset.x + (dragStart.x - e.clientX),
-        y: cameraOffset.y + (dragStart.y - e.clientY)
+    // Ensure coordinates are within grid bounds
+    if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+      setHoveredTile({ x, y });
+      
+      // Update player cursor
+      updatePlayerCursor(playerId, x, y).catch(err => {
+        console.error("Error updating cursor position:", err);
       });
-      setDragStart({ x: e.clientX, y: e.clientY });
+      
+      // Update local player state
+      setPlayers(prev => ({
+        ...prev,
+        [playerId]: {
+          ...prev[playerId],
+          cursor: { x, y },
+          lastPlaced: prev[playerId]?.lastPlaced || 0
+        }
+      }));
     }
   };
   
@@ -102,11 +136,21 @@ const GameRenderer: React.FC<GameRendererProps> = ({
     setIsDragging(false);
   };
   
-  // Handle tile placement on click
+  // Add this helper function inside your component
+  const ensureValidCoordinates = (x: number, y: number) => {
+    // Ensure coordinates are within grid bounds
+    return {
+      x: Math.min(Math.max(0, x), GRID_SIZE - 1),
+      y: Math.min(Math.max(0, y), GRID_SIZE - 1)
+    };
+  };
+  
+  // Then use it in your handleClick function
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!hoveredTile) return;
     
-    const { x, y } = hoveredTile;
+    // Ensure coordinates are valid
+    const { x, y } = ensureValidCoordinates(hoveredTile.x, hoveredTile.y);
     
     // Check if this tile is already occupied
     const tileKey = `${x}-${y}`;
@@ -131,36 +175,80 @@ const GameRenderer: React.FC<GameRendererProps> = ({
     // you'd adjust the tile size or scale based on wheel delta
     // and recalculate the camera offset to zoom toward the cursor
   };
+
+  // Toggle help
+  const toggleHelp = () => {
+    setShowHelp(!showHelp);
+  };
   
   // Set up canvas and draw the game
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    // Set canvas size based on container
+    // Set up a resize handler that maintains aspect ratio
     const updateCanvasSize = () => {
       const container = canvas.parentElement;
-      if (container) {
-        const { width, height } = container.getBoundingClientRect();
-        setCanvasSize({ width, height });
-        canvas.width = width;
-        canvas.height = height;
-      }
+      if (!container) return;
+      
+      // Get the container dimensions
+      const containerRect = container.getBoundingClientRect();
+      
+      // Use a larger percentage of the available container space
+      let size = Math.min(
+        Math.max(containerRect.width, DEFAULT_CANVAS_SIZE), 
+        Math.max(containerRect.height, DEFAULT_CANVAS_SIZE)
+      );
+      
+      // Ensure the size is a multiple of the grid size for even cell dimensions
+      size = Math.floor(size / GRID_SIZE) * GRID_SIZE;
+      
+      // Set a minimum size - increased from 320px
+      size = Math.max(size, DEFAULT_CANVAS_SIZE); // Minimum size is now DEFAULT_CANVAS_SIZE
+      
+      // Update canvas dimensions
+      canvas.width = size;
+      canvas.height = size;
+      
+      // Update the state for other calculations
+      setCanvasSize({ width: size, height: size });
+      
+      // Update tile size based on canvas dimensions
+      const newTileSize = size / GRID_SIZE;
+      setTileSize(newTileSize);
     };
     
-    // Initial size update
+    // Call once to initialize
     updateCanvasSize();
     
-    // Add resize listener
+    // Set up listener for window resize
     window.addEventListener('resize', updateCanvasSize);
     
-    // Cleanup
+    // Clean up on unmount
     return () => {
       window.removeEventListener('resize', updateCanvasSize);
     };
   }, []);
   
-  // Draw the game whenever relevant state changes
+  // Add a function to get the canvas filter based on weather and time of day
+  const getCanvasFilter = () => {
+    let filter = weather.effects.visualFilter;
+    
+    // Apply day/night effects
+    if (!gameTime.isDayTime) {
+      if (gameTime.timeOfDay === 'dusk') {
+        filter += ' brightness(0.9) sepia(0.2)';
+      } else if (gameTime.timeOfDay === 'night') {
+        filter += ' brightness(0.7) saturate(0.8)';
+      }
+    } else if (gameTime.timeOfDay === 'dawn') {
+      filter += ' brightness(0.9) sepia(0.3)';
+    }
+    
+    return filter;
+  };
+  
+  // Modify the drawing effect to apply weather and time filters
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -168,140 +256,107 @@ const GameRenderer: React.FC<GameRendererProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Apply weather and time of day filter
+    const filter = getCanvasFilter();
+    if (filter !== 'none') {
+      ctx.filter = filter;
+    }
+    
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Calculate the exact tile size
+    const cellSize = canvas.width / GRID_SIZE;
+    
     // Draw grid background
-    ctx.fillStyle = '#f0f0f0';
+    ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Calculate visible grid area
-    const startX = Math.floor(cameraOffset.x / tileSize);
-    const startY = Math.floor(cameraOffset.y / tileSize);
-    const visibleTilesX = Math.ceil(canvas.width / tileSize) + 1;
-    const visibleTilesY = Math.ceil(canvas.height / tileSize) + 1;
-    
     // Draw grid lines
-    ctx.strokeStyle = '#e0e0e0';
+    ctx.beginPath();
+    ctx.strokeStyle = '#e5e5e5';
     ctx.lineWidth = 1;
     
-    // Vertical lines
-    for (let x = 0; x <= visibleTilesX; x++) {
-      const xPos = x * tileSize - (cameraOffset.x % tileSize);
-      ctx.beginPath();
+    // Draw vertical grid lines
+    for (let x = 0; x <= GRID_SIZE; x++) {
+      const xPos = Math.floor(x * cellSize) + 0.5; // +0.5 for crisp lines
       ctx.moveTo(xPos, 0);
       ctx.lineTo(xPos, canvas.height);
-      ctx.stroke();
     }
     
-    // Horizontal lines
-    for (let y = 0; y <= visibleTilesY; y++) {
-      const yPos = y * tileSize - (cameraOffset.y % tileSize);
-      ctx.beginPath();
+    // Draw horizontal grid lines
+    for (let y = 0; y <= GRID_SIZE; y++) {
+      const yPos = Math.floor(y * cellSize) + 0.5; // +0.5 for crisp lines
       ctx.moveTo(0, yPos);
       ctx.lineTo(canvas.width, yPos);
-      ctx.stroke();
     }
     
-    // Draw placed tiles
-    for (let x = startX; x < startX + visibleTilesX; x++) {
-      for (let y = startY; y < startY + visibleTilesY; y++) {
-        const tileKey = `${x}-${y}`;
-        const tile = tiles[tileKey];
-        
-        if (tile && tile.type !== 'empty') {
-          const screenX = x * tileSize - cameraOffset.x;
-          const screenY = y * tileSize - cameraOffset.y;
-          
-          // Draw tile background
-          ctx.fillStyle = TILE_COLORS[tile.type];
-          ctx.fillRect(screenX, screenY, tileSize, tileSize);
-          
-          // Draw tile border
-          ctx.strokeStyle = '#00000033';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(screenX, screenY, tileSize, tileSize);
-          
-          // Draw tile icon/symbol
-          ctx.fillStyle = '#000000';
-          ctx.font = '16px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(
-            TILE_ICONS[tile.type],
-            screenX + tileSize / 2,
-            screenY + tileSize / 2
-          );
-        }
-      }
-    }
+    ctx.stroke();
     
-    // Draw hovered tile preview
-    if (hoveredTile) {
-      const { x, y } = hoveredTile;
-      const tileKey = `${x}-${y}`;
-      const existingTile = tiles[tileKey];
+    // Draw tiles
+    Object.values(tiles).forEach(tile => {
+      if (!tile || tile.type === 'empty') return;
       
-      // Only draw preview if there's no tile already placed
-      if (!existingTile || existingTile.type === 'empty') {
-        const screenX = x * tileSize - cameraOffset.x;
-        const screenY = y * tileSize - cameraOffset.y;
-        
-        // Draw preview with transparency
-        ctx.globalAlpha = 0.5;
-        ctx.fillStyle = TILE_COLORS[selectedTile];
-        ctx.fillRect(screenX, screenY, tileSize, tileSize);
-        
-        // Draw tile icon/symbol
-        ctx.fillStyle = '#000000';
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(
-          TILE_ICONS[selectedTile],
-          screenX + tileSize / 2,
-          screenY + tileSize / 2
-        );
-        ctx.globalAlpha = 1.0;
-      }
-    }
-    
-    // Draw other players' cursors
-    Object.values(players).forEach(player => {
-      // Skip invalid players or current player
-      if (!player || !player.id || player.id === playerId || !player.cursor) return;
+      const x = tile.x * cellSize;
+      const y = tile.y * cellSize;
       
-      const screenX = player.cursor.x * tileSize - cameraOffset.x;
-      const screenY = player.cursor.y * tileSize - cameraOffset.y;
+      // Draw tile background
+      ctx.fillStyle = TILE_COLORS[tile.type];
+      ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
       
-      // Generate a consistent color for each player based on their ID
-      const playerColor = generatePlayerColor(player.id);
-      
-      // Draw cursor with player-specific color
-      ctx.fillStyle = playerColor;
-      ctx.beginPath();
-      ctx.arc(
-        screenX + tileSize / 2,
-        screenY + tileSize / 2,
-        8, // Make cursor slightly larger
-        0,
-        Math.PI * 2
-      );
-      ctx.fill();
-      
-      // Draw a small label with player ID - safely get the first few characters
-      const displayId = player.id && player.id.length > 0 ? player.id.slice(0, 4) : 'anon';
-      ctx.fillStyle = playerColor;
-      ctx.font = 'bold 12px Arial';
+      // Draw tile icon
+      ctx.fillStyle = 'black';
+      ctx.font = `${Math.floor(cellSize * 0.6)}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText(
-        displayId,
-        screenX + tileSize / 2,
-        screenY - 8
-      );
+      ctx.textBaseline = 'middle';
+      ctx.fillText(TILE_ICONS[tile.type], x + cellSize / 2, y + cellSize / 2);
     });
     
-  }, [tiles, players, hoveredTile, selectedTile, playerId, cameraOffset, canvasSize, tileSize]);
+    // Draw hover effect
+    if (hoveredTile) {
+      const x = hoveredTile.x * cellSize;
+      const y = hoveredTile.y * cellSize;
+      const tileKey = `${hoveredTile.x}-${hoveredTile.y}`;
+      
+      // Only show hover if no tile exists
+      if (!tiles[tileKey] || tiles[tileKey].type === 'empty') {
+        // Draw semi-transparent preview
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = TILE_COLORS[selectedTile];
+        ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+        
+        // Draw preview icon
+        ctx.fillStyle = 'black';
+        ctx.font = `${Math.floor(cellSize * 0.6)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(TILE_ICONS[selectedTile], x + cellSize / 2, y + cellSize / 2);
+        ctx.globalAlpha = 1.0;
+      }
+      
+      // Always draw hover border
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
+    }
+    
+    // Draw player cursors
+    Object.values(players).forEach(player => {
+      if (!player || !player.cursor || player.id === playerId) return;
+      
+      const x = player.cursor.x * cellSize;
+      const y = player.cursor.y * cellSize;
+      
+      // Draw cursor
+      ctx.fillStyle = generatePlayerColor(player.id);
+      ctx.beginPath();
+      ctx.arc(x + cellSize / 2, y + cellSize / 2, cellSize / 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    
+    // Reset filter when done
+    ctx.filter = 'none';
+  }, [tiles, players, hoveredTile, selectedTile, canvasSize, weather, gameTime]);
   
   // Helper function to generate a consistent color from player ID
   const generatePlayerColor = (id?: string): string => {
@@ -322,8 +377,65 @@ const GameRenderer: React.FC<GameRendererProps> = ({
     return `rgb(${Math.abs(r)}, ${Math.abs(g)}, ${Math.abs(b)})`;
   };
   
+  // Update the tile drawing code to handle special tiles
+  const drawTile = (ctx: CanvasRenderingContext2D, tile: Tile, screenX: number, screenY: number) => {
+    const tileKey = `${tile.x}-${tile.y}`;
+    const isSpecial = specialTiles && specialTiles[tileKey];
+    
+    // Draw tile background
+    ctx.fillStyle = TILE_COLORS[tile.type];
+    ctx.fillRect(screenX, screenY, tileSize, tileSize);
+    
+    // Add special effects for special tiles
+    if (isSpecial) {
+      // Draw a glowing border
+      ctx.strokeStyle = 'gold';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(screenX, screenY, tileSize, tileSize);
+      
+      // Add sparkling effect
+      const now = Date.now();
+      for (let i = 0; i < 3; i++) {
+        const sparkX = screenX + Math.sin(now / 500 + i * 2) * (tileSize / 3) + tileSize / 2;
+        const sparkY = screenY + Math.cos(now / 500 + i * 2) * (tileSize / 3) + tileSize / 2;
+        
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.beginPath();
+        ctx.arc(sparkX, sparkY, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      // Draw regular tile border
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(screenX, screenY, tileSize, tileSize);
+    }
+    
+    // Draw tile icon/symbol
+    ctx.fillStyle = '#000000';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      TILE_ICONS[tile.type],
+      screenX + tileSize / 2,
+      screenY + tileSize / 2
+    );
+    
+    // Add special tile indicator if applicable
+    if (isSpecial) {
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 8px Arial';
+      ctx.fillText(
+        '✨',
+        screenX + tileSize / 4,
+        screenY + tileSize / 4
+      );
+    }
+  };
+  
   return (
-    <div className="game-renderer" data-tile={selectedTile}>
+    <div className="game-renderer" data-weather={weather.type} data-time={gameTime.timeOfDay}>
       <canvas
         ref={canvasRef}
         className="game-canvas"
@@ -334,6 +446,33 @@ const GameRenderer: React.FC<GameRendererProps> = ({
         onContextMenu={handleContextMenu}
         onWheel={handleWheel}
       />
+      
+      {/* Visual effect overlays */}
+      {weather.type === 'rainy' && (
+        <div className="rain-effect"></div>
+      )}
+      {weather.type === 'snowy' && (
+        <div className="snow-effect"></div>
+      )}
+      {weather.type === 'foggy' && (
+        <div className="fog-effect"></div>
+      )}
+      
+      {/* Game controls */}
+      <div className="game-controls">
+        <button className="control-button" onClick={toggleHelp} title="Help">❓</button>
+      </div>
+      
+      {/* Help panel */}
+      {showHelp && (
+        <div className="game-help">
+          <p>🖱️ Click to place a tile</p>
+          <p>🔄 Select tiles from the palette</p>
+          <p>👥 Other players are shown as circles</p>
+          <p>💧 Place water near houses for bonuses</p>
+          <p>🏠 Houses near markets are more valuable</p>
+        </div>
+      )}
     </div>
   );
 };

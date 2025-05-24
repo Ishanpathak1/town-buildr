@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   calculateTownScore, 
-  getCurrentTownLevel, 
+  getTownLevel,
   getProgressToNextLevel,
   TOWN_LEVELS
 } from '../game/GameMechanics';
@@ -9,16 +9,16 @@ import type { Tile, MysteryTile } from '../types/game';
 import '../styles/TownStats.css';
 
 interface TownStatsProps {
-  tiles: Record<string, Tile>;
-  mysteryTiles: Record<string, MysteryTile>;
+  tiles: Record<string, Tile> | null | undefined;
+  mysteryTiles: Record<string, MysteryTile> | null | undefined;
 }
 
-const TownStats: React.FC<TownStatsProps> = ({ tiles, mysteryTiles }) => {
+const TownStats: React.FC<TownStatsProps> = ({ tiles, mysteryTiles = {} }) => {
   // Calculate current town score
-  const score = calculateTownScore(tiles, mysteryTiles);
+  const score = calculateTownScore(tiles);
   
   // Get current town level
-  const currentLevel = getCurrentTownLevel(score);
+  const currentLevel = getTownLevel(score);
   
   // Calculate progress to next level
   const progressPercent = getProgressToNextLevel(score);
@@ -29,17 +29,21 @@ const TownStats: React.FC<TownStatsProps> = ({ tiles, mysteryTiles }) => {
     ? TOWN_LEVELS[currentLevelIndex + 1] 
     : null;
   
-  // Count different tile types
+  // Count different tile types with null check
   const tileCounts: Record<string, number> = {};
-  Object.values(tiles).forEach(tile => {
-    tileCounts[tile.type] = (tileCounts[tile.type] || 0) + 1;
-  });
+  if (tiles) {
+    Object.values(tiles).forEach(tile => {
+      if (tile && tile.type) {
+        tileCounts[tile.type] = (tileCounts[tile.type] || 0) + 1;
+      }
+    });
+  }
   
   return (
     <div className="town-stats">
       <div className="town-level">
         <h3>{currentLevel.name}</h3>
-        <p className="town-description">{currentLevel.description}</p>
+        <p className="town-description">Score: {score} points</p>
       </div>
       
       <div className="town-score">
@@ -63,7 +67,7 @@ const TownStats: React.FC<TownStatsProps> = ({ tiles, mysteryTiles }) => {
             />
           </div>
           <div className="progress-points">
-            <span>{score}/{nextLevel.minScore} points</span>
+            <span>{score}/{nextLevel.threshold} points</span>
           </div>
         </div>
       )}
@@ -80,7 +84,7 @@ const TownStats: React.FC<TownStatsProps> = ({ tiles, mysteryTiles }) => {
         </div>
       </div>
       
-      {Object.keys(mysteryTiles).length > 0 && (
+      {mysteryTiles && Object.keys(mysteryTiles).length > 0 && (
         <div className="mystery-tiles">
           <h4>Special Discoveries</h4>
           <div className="mystery-list">

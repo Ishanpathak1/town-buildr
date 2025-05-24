@@ -11,51 +11,36 @@ export const TILE_BASE_SCORES: Record<TileType, number> = {
   road: 2,
 };
 
-// Town progression levels
-export interface TownLevel {
-  name: string;
-  minScore: number;
-  maxScore: number;
-  description: string;
-  color: string;
-}
+// Define scoring values for different tile types
+export const TILE_SCORES: Record<string, number> = {
+  empty: 0,
+  grass: 1,
+  forest: 2,
+  water: 3,
+  house: 5,
+  market: 7,
+  road: 2
+};
 
-export const TOWN_LEVELS: TownLevel[] = [
-  { 
-    name: "Hamlet", 
-    minScore: 0, 
-    maxScore: 100, 
-    description: "A tiny settlement in the wilderness",
-    color: "#a8d08d" 
-  },
-  { 
-    name: "Village", 
-    minScore: 101, 
-    maxScore: 250, 
-    description: "A small but growing community",
-    color: "#70ad47" 
-  },
-  { 
-    name: "Town", 
-    minScore: 251, 
-    maxScore: 500, 
-    description: "A bustling town with busy streets",
-    color: "#4472c4" 
-  },
-  { 
-    name: "City", 
-    minScore: 501, 
-    maxScore: 1000, 
-    description: "A thriving urban center",
-    color: "#2f5597" 
-  },
-  { 
-    name: "Metropolis", 
-    minScore: 1001, 
-    maxScore: Infinity, 
-    description: "A massive, sprawling metropolis",
-    color: "#7030a0" 
-  },
+// Define which tiles work well together (adjacency bonuses)
+export const TILE_SYNERGIES: Record<string, string[]> = {
+  empty: [],
+  grass: ['house', 'market'],
+  forest: ['house', 'water'],
+  water: ['forest', 'house'],
+  house: ['market', 'road', 'grass', 'forest', 'water'],
+  market: ['house', 'road'],
+  road: ['house', 'market']
+};
+
+// Town levels based on score
+export const TOWN_LEVELS = [
+  { name: "Tiny Settlement", threshold: 0, color: "#6c757d" },
+  { name: "Small Village", threshold: 50, color: "#28a745" },
+  { name: "Growing Town", threshold: 150, color: "#17a2b8" },
+  { name: "Bustling City", threshold: 300, color: "#007bff" },
+  { name: "Metropolis", threshold: 500, color: "#dc3545" },
+  { name: "Mega City", threshold: 1000, color: "#ffc107" }
 ];
 
 // Adjacency bonus rules
@@ -211,39 +196,65 @@ export const calculateTileScore = (
 };
 
 // Calculate total town score
-export const calculateTownScore = (
-  tiles: Record<string, Tile>,
-  mysteryTiles: Record<string, MysteryTile> = {}
-): number => {
-  let totalScore = 0;
+export const calculateTownScore = (tiles: Record<string, Tile> | null | undefined): number => {
+  // If tiles is null or undefined, return 0
+  if (!tiles) {
+    return 0;
+  }
   
+  let score = 0;
+  
+  // First pass: base scores for each tile
   Object.values(tiles).forEach(tile => {
-    totalScore += calculateTileScore(tile, tiles, mysteryTiles);
+    if (tile && tile.type) {
+      score += TILE_SCORES[tile.type] || 0;
+    }
   });
   
-  return totalScore;
+  // Second pass: adjacency bonuses
+  Object.values(tiles).forEach(tile => {
+    if (!tile || !tile.type || tile.type === 'empty') return;
+    
+    // Check all adjacent tiles for synergies
+    const adjacentPositions = [
+      `${tile.x+1}-${tile.y}`, // right
+      `${tile.x-1}-${tile.y}`, // left
+      `${tile.x}-${tile.y+1}`, // down
+      `${tile.x}-${tile.y-1}`, // up
+    ];
+    
+    for (const pos of adjacentPositions) {
+      const adjacentTile = tiles[pos];
+      if (adjacentTile && adjacentTile.type) {
+        // Check if there's a synergy
+        if (TILE_SYNERGIES[tile.type].includes(adjacentTile.type)) {
+          score += 2; // Synergy bonus
+        }
+      }
+    }
+  });
+  
+  return score;
 };
 
 // Get current town level based on score
-export const getCurrentTownLevel = (score: number): TownLevel => {
-  for (const level of TOWN_LEVELS) {
-    if (score >= level.minScore && score <= level.maxScore) {
-      return level;
+export const getTownLevel = (score: number) => {
+  for (let i = TOWN_LEVELS.length - 1; i >= 0; i--) {
+    if (score >= TOWN_LEVELS[i].threshold) {
+      return TOWN_LEVELS[i];
     }
   }
-  
-  // Default to the highest level if somehow score exceeds all defined levels
-  return TOWN_LEVELS[TOWN_LEVELS.length - 1];
+  return TOWN_LEVELS[0];
 };
 
 // Calculate progress to next level (as a percentage)
 export const getProgressToNextLevel = (score: number): number => {
-  const currentLevel = getCurrentTownLevel(score);
+  const currentLevel = getTownLevel(score);
   // If at max level, return 100%
-  if (currentLevel.maxScore === Infinity) return 100;
+  if (currentLevel.threshold === Infinity) return 100;
   
-  const levelProgress = score - currentLevel.minScore;
-  const levelRange = currentLevel.maxScore - currentLevel.minScore;
+  const levelProgress = score - currentLevel.threshold;
+  const levelRange = Infinity - currentLevel.threshold;
   return Math.min(100, Math.floor((levelProgress / levelRange) * 100));
 };
 
