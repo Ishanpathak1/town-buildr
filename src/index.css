@@ -1,0 +1,64 @@
+:root {
+  --primary-color: #74c0fc;
+  --text-color: #212529;
+  --background-color: #f8f9fa;
+  --card-background: #ffffff;
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  --hover-color: #f1f3f5;
+  --border-color: #e9ecef;
+  --border-radius: 12px;
+  --transition-speed: 0.2s;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  transition: background-color 0.5s ease;
+}
+
+body.night-mode {
+  --background-color: #343a40;
+  --text-color: #f8f9fa;
+  --card-background: #495057;
+  --shadow-color: rgba(0, 0, 0, 0.2);
+  --hover-color: #495057;
+  --border-color: #495057;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+}
+
+button:focus {
+  outline: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #adb5bd;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #868e96;
+}

@@ -1,0 +1,180 @@
+.player-list {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  padding: var(--space-md);
+  width: 100%;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: var(--space-md);
+}
+
+.player-list h3 {
+  margin-top: 0;
+  margin-bottom: var(--space-md);
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.player-list h3::before {
+  content: "👥";
+  font-size: 1.4rem;
+}
+
+.player-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.player-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-sm);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-color);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.player-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.player-item.current-player {
+  background-color: rgba(var(--primary-color), 0.1);
+  border-left: 3px solid var(--primary-color);
+}
+
+.player-item.active-player {
+  box-shadow: 0 0 0 2px rgba(0, 200, 0, 0.2);
+}
+
+.player-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: var(--space-sm);
+  font-size: 18px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.player-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-name {
+  font-size: 0.9rem;
+  color: var(--text-color);
+  font-weight: 600;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-position {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+.player-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: var(--space-sm);
+}
+
+.player-status.active {
+  background-color: #2ecc71;
+  box-shadow: 0 0 6px rgba(46, 204, 113, 0.8);
+}
+
+.player-status.inactive {
+  background-color: #95a5a6;
+}
+
+.player-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.player-status.active {
+  animation: pulse 2s infinite;
+}
+
+.connection-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-left: 8px;
+  position: relative;
+}
+
+.connection-indicator::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.connection-indicator.connected {
+  background-color: #2ecc71;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+  animation: pulse 2s infinite;
+}
+
+.connection-indicator.disconnected {
+  background-color: #e74c3c;
+}
+
+.player-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.clear-others-btn {
+  background-color: var(--danger-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-others-btn:hover {
+  background-color: #c0392b;
+  transform: translateY(-1px);
+} 

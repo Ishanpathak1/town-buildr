@@ -1,0 +1,250 @@
+.game-rules {
+  position: relative;
+  z-index: 100;
+  width: 100%;
+}
+
+.rules-toggle {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.rules-toggle::before {
+  content: "📋";
+}
+
+.rules-toggle:hover {
+  background-color: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(108, 92, 231, 0.3);
+}
+
+.rules-content {
+  position: absolute;
+  top: calc(100% + var(--space-sm));
+  left: 0;
+  width: 100%;
+  max-height: 70vh;
+  overflow-y: auto;
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  padding: var(--space-md);
+  z-index: 101;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rules-content h2 {
+  color: var(--primary-color);
+  margin-top: 0;
+  margin-bottom: var(--space-md);
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.rule-section {
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--bg-color);
+}
+
+.rule-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.rule-section h3 {
+  color: var(--primary-color);
+  font-size: 1.1rem;
+  margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.rule-section h3::before {
+  font-size: 1.2rem;
+}
+
+.rule-section:nth-child(1) h3::before { content: "🎮"; }
+.rule-section:nth-child(2) h3::before { content: "💎"; }
+.rule-section:nth-child(3) h3::before { content: "🔄"; }
+.rule-section:nth-child(4) h3::before { content: "✨"; }
+.rule-section:nth-child(5) h3::before { content: "🏙️"; }
+.rule-section:nth-child(6) h3::before { content: "🎯"; }
+.rule-section:nth-child(7) h3::before { content: "🔥"; }
+
+.rule-section p {
+  color: var(--text-color);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: var(--space-sm);
+}
+
+.tiles-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.tile-value {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: var(--bg-color);
+  padding: var(--space-sm);
+  border-radius: var(--border-radius-sm);
+  text-align: center;
+}
+
+.tile-type {
+  text-transform: capitalize;
+  font-weight: 600;
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+  color: var(--text-color);
+}
+
+.tile-score {
+  color: var(--primary-color);
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.adjacency-rules {
+  margin: 0;
+  padding-left: var(--space-md);
+}
+
+.adjacency-rules li {
+  margin-bottom: var(--space-sm);
+  color: var(--text-color);
+  font-size: 0.9rem;
+}
+
+.adjacency-rules li strong {
+  color: var(--primary-color);
+}
+
+.mystery-tiles-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.mystery-tile {
+  background-color: var(--bg-color);
+  border-radius: var(--border-radius-sm);
+  border-left: 4px solid;
+  padding: var(--space-sm);
+}
+
+.mystery-tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.mystery-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-color);
+}
+
+.mystery-rarity {
+  text-transform: capitalize;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  color: var(--text-light);
+}
+
+.mystery-description {
+  color: var(--text-light);
+  font-size: 0.85rem;
+  margin-bottom: var(--space-sm);
+}
+
+.mystery-bonus {
+  font-weight: bold;
+  color: var(--primary-color);
+  text-align: right;
+  font-size: 0.9rem;
+}
+
+.town-levels-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.town-level-item {
+  background-color: var(--bg-color);
+  border-radius: var(--border-radius-sm);
+  border-left: 4px solid;
+  padding: var(--space-sm) var(--space-md);
+  position: relative;
+}
+
+.level-name {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-right: var(--space-sm);
+  color: var(--text-color);
+}
+
+.level-range {
+  color: var(--text-light);
+  font-size: 0.85rem;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 12px;
+}
+
+.level-description {
+  color: var(--text-light);
+  font-size: 0.85rem;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .rules-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-height: 80%;
+    max-width: 500px;
+  }
+  
+  .tiles-list,
+  .mystery-tiles-list {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  }
+} 
